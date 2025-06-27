@@ -42,6 +42,17 @@ screenshot_count = 0
 frame_times = deque(maxlen=30)
 last_frame_time = time.time()
 
+# Recording variables
+recording = False
+video_writer = None
+recording_start_time = 0
+recordings_dir = "recordings"
+current_recording_file = None
+recording_fps = 30  # Target FPS for recording
+last_recording_frame_time = 0
+frame_skip_counter = 0  # Counter for frame skipping method
+recording_frame_buffer = queue.Queue(maxsize=100)  # Buffer for smooth recording
+
 # Drone control variables
 for_back_velocity = 0
 left_right_velocity = 0
@@ -63,6 +74,7 @@ set_autonomous_behavior = False
 # Joystick screenshot variables
 last_joystick_screenshot_button_state = False
 joystick_screenshot_requested = False
+last_joystick_recording_button_state = False
 
 # Global objects
 tello = None
@@ -166,6 +178,68 @@ def create_screenshot_directory():
             print(f"Created directory: {screenshot_dir}")
     except Exception as e:
         print(f"Failed to create screenshot directory: {e}")
+
+def create_recordings_directory():
+    """Create recordings directory if it doesn't exist"""
+    try:
+        if not os.path.exists(recordings_dir):
+            os.makedirs(recordings_dir)
+            print(f"Created directory: {recordings_dir}")
+    except Exception as e:
+        print(f"Failed to create recordings directory: {e}")
+
+def start_recording():
+    """Start video recording"""
+    global recording, video_writer, recording_start_time, current_recording_file, last_recording_frame_time
+    
+    try:
+        if not recording:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            current_recording_file = f"tello_flight_{timestamp}.mp4"
+            filepath = os.path.join(recordings_dir, current_recording_file)
+            
+            # Use consistent 30 FPS with time-based control
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            video_writer = cv2.VideoWriter(filepath, fourcc, 30.0, (WINDOW_WIDTH, WINDOW_HEIGHT))
+            
+            if video_writer.isOpened():
+                recording = True
+                recording_start_time = time.time()
+                last_recording_frame_time = time.time()
+                print(f"🔴 Recording started: {current_recording_file}")
+                print("📝 Using time-based frame control for consistent speed")
+                return True
+            else:
+                print("❌ Failed to start recording - could not open video writer")
+                return False
+    except Exception as e:
+        print(f"Error starting recording: {e}")
+        return False
+
+def stop_recording():
+    """Stop video recording"""
+    global recording, video_writer, current_recording_file
+    
+    try:
+        if recording and video_writer:
+            recording = False
+            video_writer.release()
+            video_writer = None
+            
+            recording_duration = time.time() - recording_start_time
+            print(f"⏹️ Recording stopped: {current_recording_file}")
+            print(f"Duration: {recording_duration:.1f} seconds")
+            return True
+    except Exception as e:
+        print(f"Error stopping recording: {e}")
+        return False
+
+def toggle_recording():
+    """Toggle recording on/off"""
+    if recording:
+        stop_recording()
+    else:
+        start_recording()
 
 def process_human_detection(frame):
     """Process human detection and return processed frame with detection info"""
@@ -314,8 +388,9 @@ def save_screenshot(frame, humans_count_param, source="auto"):
         return False
 
 def video_stream_thread():
-    """Thread 1: Handle video capture, processing, and screenshot operations"""
+    """Thread 1: Handle video capture, processing, screenshot operations, and recording"""
     global running, current_frame, current_processed_frame, human_detected, humans_count, fps, frame_times
+    global last_recording_frame_time
     
     print("Video stream thread started")
     
@@ -347,6 +422,24 @@ def video_stream_thread():
                         except queue.Empty:
                             break
                     
+                    # TIME-BASED RECORDING - Save frame only at specific intervals
+                    if recording and video_writer and video_writer.isOpened():
+                        current_time = time.time()
+                        time_since_last_record = current_time - last_recording_frame_time
+                        
+                        # Save frame exactly every 1/30 second (33.33ms) for consistent 30 FPS
+                        if time_since_last_record >= (1.0 / 30.0):
+                            frame_bgr = cv2.cvtColor(output_frame, cv2.COLOR_RGB2BGR)
+                            video_writer.write(frame_bgr)
+                            last_recording_frame_time = current_time
+                            
+                            # Add frame to buffer for recording thread
+                            try:
+                                if not recording_frame_buffer.full():
+                                    recording_frame_buffer.put_nowait(frame_bgr.copy())
+                            except queue.Full:
+                                pass  # Skip if buffer is full
+                    
                     # Update shared data
                     with data_lock:
                         current_frame = frame.copy()
@@ -360,8 +453,9 @@ def video_stream_thread():
                         if len(frame_times) > 1:
                             time_diff = frame_times[-1] - frame_times[0]
                             fps = len(frame_times) / time_diff if time_diff > 0 else 0
-                        
-                time.sleep(1/60)  # Limit to 60 FPS capture
+                
+                # Control processing speed - but don't let it affect recording timing
+                time.sleep(0.01)  # Small sleep to prevent CPU overload
                 
             except Exception as e:
                 print(f"Video stream error: {e}")
@@ -487,6 +581,33 @@ def detection_thread():
     
     print("Detection thread ended")
 
+def recording_thread_func():
+    """Dedicated thread for smooth recording - Thread 5"""
+    print("Recording thread started")
+    
+    while running:
+        try:
+            if recording and video_writer and video_writer.isOpened():
+                # Process buffered frames for smooth recording
+                frames_written = 0
+                while not recording_frame_buffer.empty() and frames_written < 5:
+                    try:
+                        frame_bgr = recording_frame_buffer.get_nowait()
+                        video_writer.write(frame_bgr)
+                        frames_written += 1
+                    except queue.Empty:
+                        break
+                
+                time.sleep(0.01)  # Small sleep to prevent CPU overload
+            else:
+                time.sleep(0.1)  # Longer sleep when not recording
+                
+        except Exception as e:
+            print(f"Recording thread error: {e}")
+            time.sleep(0.1)
+    
+    print("Recording thread ended")
+
 def autonomous_behavior_thread():
     """Thread for autonomous behavior based on detection results"""
     print("Autonomous behavior thread started")
@@ -570,7 +691,7 @@ def drone_control_thread():
 def get_joystick_input():
     """Get joystick input"""
     global left_right_velocity, for_back_velocity, up_down_velocity, yaw_velocity
-    global last_joystick_screenshot_button_state, send_rc_control
+    global last_joystick_screenshot_button_state, last_joystick_recording_button_state, send_rc_control
     
     if not joystick:
         return
@@ -612,6 +733,14 @@ def get_joystick_input():
         if joystick.get_button(3):  # Alternative screenshot button
             request_manual_screenshot("joystick")
             time.sleep(0.2)
+
+        # Recording button (Button 4 / Y button)
+        current_recording_button_state = joystick.get_button(4)
+        if current_recording_button_state and not last_joystick_recording_button_state:
+            toggle_recording()
+            time.sleep(0.3)  # Prevent multiple triggers
+        
+        last_joystick_recording_button_state = current_recording_button_state
         
         if joystick.get_button(6):
             global set_autonomous_behavior
@@ -684,6 +813,11 @@ def start_threads():
     autonomous_thread.start()
     threads.append(autonomous_thread)
     
+    # Start dedicated recording thread for smooth recording
+    recording_thread = threading.Thread(target=recording_thread_func, daemon=True)
+    recording_thread.start()
+    threads.append(recording_thread)
+    
     print(f"Started {len(threads)} worker threads")
 
 def stop_threads():
@@ -692,6 +826,10 @@ def stop_threads():
     
     print("Stopping threads...")
     running = False
+    
+    # Stop recording if active
+    if recording:
+        stop_recording()
     
     # Wait for threads to finish
     for thread in threads:
@@ -719,8 +857,10 @@ def main_loop():
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         should_stop = True
-                    elif event.key == pygame.K_p:  # FIX: Add keyboard screenshot
+                    elif event.key == pygame.K_p:  # Screenshot
                         request_manual_screenshot("keyboard")
+                    elif event.key == pygame.K_r:  # Toggle recording
+                        toggle_recording()
 
             # Get input
             get_joystick_input()
@@ -756,11 +896,19 @@ def main_loop():
                 cv2.putText(display_frame, "4-THREAD MODE", (10, 150),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
 
+                # Show recording status
+                if recording:
+                    recording_duration = time.time() - recording_start_time
+                    cv2.putText(display_frame, f"🔴 REC {recording_duration:.1f}s", (10, 180),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    # Add red circle indicator
+                    cv2.circle(display_frame, (WINDOW_WIDTH - 30, 30), 15, (0, 0, 255), -1)
+
                 # Show countdown if active
                 if countdown_active:
                     elapsed = time.time() - countdown_start_time
                     remaining = max(0, countdown_duration - elapsed)
-                    cv2.putText(display_frame, f"Screenshot in: {remaining:.1f}s", (10, 180),
+                    cv2.putText(display_frame, f"Screenshot in: {remaining:.1f}s", (10, 210),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
                 # Convert frame for pygame display
@@ -796,26 +944,31 @@ def main_loop():
 
 def main():
     """Main function"""
-    print("4-Thread Tello Drone Control System")
+    print("5-Thread Tello Drone Control System with Smooth Recording")
     print("Architecture:")
-    print("- Thread 1: Video stream, human detection, and screenshot processing")
+    print("- Thread 1: Video stream and human detection")
     print("- Thread 2: Drone control commands and battery monitoring")
     print("- Thread 3: Red color detection")
     print("- Thread 4: Autonomous behavior")
+    print("- Thread 5: Dedicated smooth recording")
     print("Features:")
     print("- Smart auto screenshot with 3-second countdown")
     print("- Manual screenshot with 'P' key or joystick buttons")
+    print("- Time-based video recording (consistent speed)")
     print("- Human detection with pose and hand tracking")
     print("- Screenshots saved in 'screenshots' folder")
+    print("- Recordings saved in 'recordings' folder")
     print("Controls:")
-    print("- Keyboard: Arrow keys=move, W/S=up/down, A/D=rotate, T=takeoff, L=land, P=screenshot")
-    print("- Joystick: Move drone, A=takeoff, B=land, X/Y=screenshot")
+    print("- Keyboard: Arrow keys=move, W/S=up/down, A/D=rotate, T=takeoff, L=land")
+    print("- P=screenshot, R=toggle recording")
+    print("- Joystick: Move drone, A=takeoff, B=land, X/Y=screenshot, Y=recording")
     print("- ESC or close window to quit")
     
     try:
         # Initialize everything
         initialize_pygame()
         create_screenshot_directory()
+        create_recordings_directory()
         
         if not initialize_tello():
             print("Failed to initialize Tello. Exiting...")
