@@ -30,6 +30,24 @@ humans_count = 0
 human_detected = False
 screenshot_count = 0
 
+# Tello State Variables
+temp = 0        # Temperature
+baro = 0        # Barometer reading
+height = 0      # Height from ground
+tof = 0         # Time of flight sensor distance
+
+pitch = 0       # Pitch angle
+roll = 0        # Roll angle
+yaw = 0         # Yaw angle
+
+vgx = 0         # Velocity X
+vgy = 0         # Velocity Y
+vgz = 0         # Velocity Z
+
+agx = 0         # Acceleration X
+agy = 0         # Acceleration Y
+agz = 0         # Acceleration Z
+
 # Performance monitoring
 frame_times = deque(maxlen=FRAME_TIME_BUFFER_SIZE)
 last_frame_time = time.time()
