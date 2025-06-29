@@ -207,30 +207,29 @@ def detection_thread():
     while state.running:
         try:
             # Only run detection if enabled
-            if state.detection_enabled:
-                # Get current frame safely
-                with state.data_lock:
-                    if state.current_processed_frame is not None:
-                        frame_copy = state.current_processed_frame.copy()
-                    else:
-                        frame_copy = None
+            # Get current frame safely
+            with state.data_lock:
+                if state.current_processed_frame is not None:
+                    frame_copy = state.current_processed_frame.copy()
+                else:
+                    frame_copy = None
+            
+            if frame_copy is not None:
+                frame_copy = cv2.cvtColor(frame_copy, cv2.COLOR_BGR2RGB)
+                # Perform detection
+                mask, result = detect_red_color(frame_copy)
+                red_in_roi, roi_mask, full_roi_mask, pixel_count = detect_red_in_roi(frame_copy)
                 
-                if frame_copy is not None:
-                    frame_copy = cv2.cvtColor(frame_copy, cv2.COLOR_BGR2RGB)
-                    # Perform detection
-                    mask, result = detect_red_color(frame_copy)
-                    red_in_roi, roi_mask, full_roi_mask, pixel_count = detect_red_in_roi(frame_copy)
-                    
-                    # Update detection results safely
-                    with state.data_lock:
-                        state.current_detection = {
-                            'red_detected': red_in_roi,
-                            'mask': mask,
-                            'result': result,
-                            'roi_mask': roi_mask,
-                            'full_roi_mask': full_roi_mask,
-                            'pixel_count': pixel_count
-                        }
+                # Update detection results safely
+                with state.data_lock:
+                    state.current_detection = {
+                        'red_detected': red_in_roi,
+                        'mask': mask,
+                        'result': result,
+                        'roi_mask': roi_mask,
+                        'full_roi_mask': full_roi_mask,
+                        'pixel_count': pixel_count
+                    }
             else:
                 # Clear detection results when disabled
                 with state.data_lock:
@@ -242,7 +241,7 @@ def detection_thread():
                         'full_roi_mask': None,
                         'pixel_count': 0
                     }
-            
+
             time.sleep(DETECTION_THREAD_SLEEP)
             
         except Exception as e:

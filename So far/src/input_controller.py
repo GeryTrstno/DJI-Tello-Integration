@@ -23,30 +23,30 @@ def get_joystick_input():
             axis_yv = state.joystick.get_axis(2)  # Up-down movement  
             axis_ud = state.joystick.get_axis(3)  # Yaw rotation
 
-            axis_side = state.joystick.get_axis(6)
-            axis_line = state.joystick.get_axis(7)
+            # axis_side = state.joystick.get_axis(6)
+            # axis_line = state.joystick.get_axis(7)
 
-            if axis_side > 0.1:
-                state.send_rc_control = False
-                state.command_queue.put("flip r")
-                state.send_rc_control = True
-                print("Flip Right")
-            elif axis_side < -0.1:
-                state.send_rc_control = False
-                state.command_queue.put("flip l")
-                state.send_rc_control = True
-                print("Flip Left")
+            # if axis_side > 0.1:
+            #     state.send_rc_control = False
+            #     state.command_queue.put("flip r")
+            #     state.send_rc_control = True
+            #     print("Flip Right")
+            # elif axis_side < -0.1:
+            #     state.send_rc_control = False
+            #     state.command_queue.put("flip l")
+            #     state.send_rc_control = True
+            #     print("Flip Left")
             
-            if axis_line < 0.1:
-                state.send_rc_control = False
-                state.command_queue.put("flip f")
-                state.send_rc_control = True
-                print("Flip Forward")
-            elif axis_line > -0.1:
-                state.send_rc_control = False
-                state.command_queue.put("flip b")
-                state.send_rc_control = True
-                print("Flip Back")
+            # if axis_line < 0.1:
+            #     state.send_rc_control = False
+            #     state.command_queue.put("flip f")
+            #     state.send_rc_control = True
+            #     print("Flip Forward")
+            # elif axis_line > -0.1:
+            #     state.send_rc_control = False
+            #     state.command_queue.put("flip b")
+            #     state.send_rc_control = True
+            #     print("Flip Back")
 
 
             # Only update velocities if joystick has significant input (deadzone)
@@ -91,18 +91,24 @@ def get_joystick_input():
             if state.joystick.get_button(6):  # Button X - toggle recording
                 if state.auto_screenshot_enabled == True:
                     state.auto_screenshot_enabled = False
+                    time.sleep(0.3)
                     print("Auto Screenshot Disabled")
                 elif state.auto_screenshot_enabled == False:
                     state.auto_screenshot_enabled = True
                     print("Auto Screenshot Enabled")
+                    time.sleep(0.3)
 
             if state.joystick.get_button(7):
                 if state.set_autonomous_behavior == False:
+                    state.send_rc_control = False
                     state.set_autonomous_behavior = True
+                    time.sleep(0.3)
                     print("Autonomous behavior enabled")
                 elif state.set_autonomous_behavior == True:
+                    state.send_rc_control = True
                     state.set_autonomous_behavior = False
                     print("Autonomous behavior disabled")
+                    time.sleep(0.3)
 
             # Handle detection toggle button (Button 10)
             current_detection_toggle_button_state = state.joystick.get_button(8)
@@ -119,17 +125,21 @@ def get_joystick_input():
                 if state.toggle_keyboard == True:
                     state.toggle_keyboard = False
                     print("Control Keyboard Disabled")
+                    time.sleep(0.3)
                 elif state.toggle_keyboard == False:
                     state.toggle_keyboard = True
                     print("Control Keyboard Enabled")
+                    time.sleep(0.3)
 
             if state.joystick.get_button(10): # Button 10 - toggle joystick control
                 if state.joystick_mode == True:
                     state.joystick_mode = False
                     print("Joystick Mode 2")
+                    time.sleep(0.3)
                 elif state.joystick_mode == False:
                     state.joystick_mode = True
                     print("Joystick Mode 1")
+                    time.sleep(0.3)
 
             # Handle emergency button (Button 11)
             current_emergency_button_state = state.joystick.get_button(11)
