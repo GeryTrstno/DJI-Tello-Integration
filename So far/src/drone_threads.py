@@ -277,7 +277,7 @@ def autonomous_behavior_thread():
                     time.sleep(2)
                 else:
                     print("⚪ No red in ROI. Searching...")
-                    state.tello.move_forward(30)
+                    state.tello.move_forward(20)
                     time.sleep(1)
             else:
                 time.sleep(AUTONOMOUS_THREAD_SLEEP)
