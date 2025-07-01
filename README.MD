@@ -1,4 +1,4 @@
-# Program Untuk Menghubungkan DJI Tello dengan Program ini
+# Langkah - Langkah Untuk Menghubungkan DJI Tello dengan Program ini
 > **Catatan:** Penggunaan Joystick hanya bisa digunakan di Linux
 
 ## Langkah Instalasi
