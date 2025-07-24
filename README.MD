@@ -60,4 +60,4 @@
 ### Catatan Tambahan
 
 - Pastikan semua perangkat keras dan perangkat lunak yang diperlukan telah terinstal dan dikonfigurasi dengan benar sebelum menjalankan aplikasi.
-- Untuk informasi lebih lanjut tentang penggunaan YOLOv8 dan Mediapipe, silakan merujuk ke dokumentasi resmi masing-masing.
+- Untuk informasi lebih lanjut tentang penggunaan YOLOv8, Mediapipe, dan SDK Tello silakan merujuk ke dokumentasi resmi masing-masing.
