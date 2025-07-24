@@ -9,12 +9,12 @@
 
 1. **Clone repository**
     ```bash
-    git clone https://github.com/GeryTrstno/protel-code.git
+    git clone https://github.com/GeryTrstno/DJI-Tello-Integration.git
     ```
 
 2. **Masuk ke direktori repository**
     ```bash
-    cd protel-code
+    cd DJI-Tello-Integration
     ```
 
 3. **Buat virtual environment**
