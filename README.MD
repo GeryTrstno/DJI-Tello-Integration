@@ -1,6 +1,6 @@
 # DJI Tello Control and Autonomous Navigation
 
-## Kontrol dan Navigasi Otonom DJI Tello: Integrasi Gamepad, Deteksi Objek YOLOv8, dan Autonomous berbasis Pendeteksian warna merah
+## Kontrol dan Navigasi Autonomous DJI Tello: Integrasi Gamepad, Deteksi Objek YOLOv8, dan Autonomous berbasis Pendeteksian warna merah
 
 ### Langkah - Langkah Untuk Menghubungkan DJI Tello dengan Program ini
 > **Catatan:** Penggunaan Joystick hanya bisa digunakan di Linux.
